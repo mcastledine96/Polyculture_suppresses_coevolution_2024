@@ -7,7 +7,7 @@ library(tidyverse)
 library(lme4)
 library(patchwork)
 library(emmeans)
-library(MuMIn)
+library(flextable)
 
 #read data
 den_dat <- read.csv("data/pvodensity_time_121120.csv", header = T)
@@ -110,6 +110,33 @@ anova(p_mod1, p_mod1.1) #sig 3 way interaction
 #for comparisons, we are interested in comm mono / phage comparisons within a time point
 emmeans::emmeans(p_mod1, pairwise ~ phage:type|time) #large differences at the start but population densities evened over time
 
+pom <- emmeans::emmeans(p_mod1, pairwise ~ phage:type|time)$contrasts
+pom <- data.frame(pom)
+
+pom <- pom[,c(1:3, 6,7)]
+pom$contrast <- gsub('comm', 'Poly.', pom$contrast)
+pom$contrast <- gsub('mono', 'Mono.', pom$contrast)
+pom$contrast <- gsub('N', 'Phage absent', pom$contrast)
+pom$contrast <- gsub('Y', 'Phage present', pom$contrast)
+pom$time <- gsub('T', '', pom$time)
+
+pom <- mutate(pom,
+              estimate = round(estimate, digits = 3),
+              t.ratio = round(t.ratio, digits = 3),
+              p.value = round(p.value, digits = 3))
+
+pom$p.value[pom$p.value == 0] <- '<0.001'
+
+pom_tab <- flextable(pom) %>%
+  set_header_labels(contrast = "Contrast", time = 'Week', estimate = 'Estimate', t.ratio = "t-ratio", p.value = "p-value") %>%
+  font(fontname = 'Times', part = 'all') %>%
+  fontsize(size = 12, part = 'all') %>%
+  autofit() %>%
+  align(j = c(1:5), align = 'center', part = 'all') %>%
+  align(j = 1, align = 'center', part = 'header') %>%
+  hline(i = c(6,12,18), border = officer::fp_border(color="black")) 
+
+
 #same for O
 o_mod1 <- lmer(logcfus ~ time * type * phage + (1|rando), data = o_den)
 o_mod1.1 <- lmer(logcfus ~ time + type + phage + time:type + time:phage + phage:type + (1|rando), data = o_den)
@@ -173,9 +200,6 @@ v_mod6.1 <- lmer(logcfus ~ time + type + phage + (1|rando), data = v_den) #drop 
 anova(v_mod5, v_mod6.1)
 v_mod7 <- lmer(logcfus ~ time + type + time:type + (1|rando), data = v_den)
 anova(v_mod5, v_mod7) #phage as an independent effect significant but not as interacting
-
-emmeans::emmeans(v_mod5, pairwise ~ type|time) #difference in poly to mono decreases over time
-emmeans::emmeans(v_mod5, pairwise ~ phage) #presence of phage overall increases V density
 
 emmeans::emmeans(v_mod5, pairwise ~ type|time) #difference in poly to mono decreases over time
 emmeans::emmeans(v_mod5, pairwise ~ phage) #presence of phage overall increases V density
